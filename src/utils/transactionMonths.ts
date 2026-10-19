@@ -2,6 +2,11 @@ import type { Transaction } from '../context/AppReducer'
 
 export type TransactionMonth = string | 'undated'
 
+export const getCurrentTransactionMonth = (): TransactionMonth => {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
 export const getTransactionMonth = (transaction: Pick<Transaction, 'date'>): TransactionMonth => {
   if (!transaction.date) {
     return 'undated'
@@ -26,8 +31,12 @@ export const getTransactionMonthLabel = (month: TransactionMonth): string => {
   )
 }
 
-export const getTransactionMonthOptions = (transactions: Transaction[]) => {
+export const getTransactionMonthOptions = (
+  transactions: Transaction[],
+  currentMonth = getCurrentTransactionMonth(),
+) => {
   const months = new Set(transactions.map(getTransactionMonth))
+  months.add(currentMonth)
 
   return Array.from(months)
     .sort((left, right) => {

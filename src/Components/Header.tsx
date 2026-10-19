@@ -53,7 +53,7 @@ const Header = ({ theme, onThemeChange }: HeaderProps) => {
               <path d="M15.5 7.5H20V12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </span>
-          <span>Ledgerly</span>
+          <span>Penny Wise</span>
         </div>
         <div className="topbar__right" ref={themePickerRef}>
           <button

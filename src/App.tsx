@@ -9,7 +9,12 @@ import type { AppTheme } from './Components/Header'
 import { GlobalProvider } from './context/GlobalState'
 import { useGlobalContext } from './context/useGlobalContext'
 import { useLocalStorage } from './hooks/useLocalStorage'
-import { getTransactionMonth, getTransactionMonthLabel, getTransactionMonthOptions } from './utils/transactionMonths'
+import {
+  getCurrentTransactionMonth,
+  getTransactionMonth,
+  getTransactionMonthLabel,
+  getTransactionMonthOptions,
+} from './utils/transactionMonths'
 import './App.css'
 
 type DashboardProps = {
@@ -19,13 +24,15 @@ type DashboardProps = {
 
 function Dashboard({ theme, onThemeChange }: DashboardProps) {
   const { transactions } = useGlobalContext()
-  const [selectedMonth, setSelectedMonth] = useState('all')
+  const [currentMonth, setCurrentMonth] = useState(getCurrentTransactionMonth)
+  const [selectedMonth, setSelectedMonth] = useState(() => currentMonth)
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false)
   const [transactionMode, setTransactionMode] = useState<TransactionMode>('any')
   const transactionDialogRef = useRef<HTMLDialogElement>(null)
+  const currentMonthRef = useRef(currentMonth)
   const monthOptions = useMemo(
-    () => getTransactionMonthOptions(transactions),
-    [transactions],
+    () => getTransactionMonthOptions(transactions, currentMonth),
+    [currentMonth, transactions],
   )
   const activeMonth = selectedMonth === 'all' ||
     monthOptions.some((option) => option.value === selectedMonth)
@@ -43,6 +50,27 @@ function Dashboard({ theme, onThemeChange }: DashboardProps) {
       transactionDialogRef.current.showModal()
     }
   }, [isAddTransactionOpen])
+
+  useEffect(() => {
+    const syncCurrentMonth = () => {
+      const month = getCurrentTransactionMonth()
+      if (month !== currentMonthRef.current) {
+        currentMonthRef.current = month
+        setCurrentMonth(month)
+        setSelectedMonth(month)
+      }
+    }
+
+    syncCurrentMonth()
+    window.addEventListener('focus', syncCurrentMonth)
+    window.addEventListener('pageshow', syncCurrentMonth)
+    document.addEventListener('visibilitychange', syncCurrentMonth)
+    return () => {
+      window.removeEventListener('focus', syncCurrentMonth)
+      window.removeEventListener('pageshow', syncCurrentMonth)
+      document.removeEventListener('visibilitychange', syncCurrentMonth)
+    }
+  }, [])
 
   const closeAddTransaction = () => {
     transactionDialogRef.current?.close()
@@ -66,7 +94,7 @@ function Dashboard({ theme, onThemeChange }: DashboardProps) {
           <div>
             <p className="eyebrow">PERSONAL FINANCE</p>
             <h1 id="page-title">Your overview</h1>
-            <p className="page-subtitle">A clear picture of where your money stands.</p>
+            <p className="page-subtitle">Make every penny count wisely.</p>
           </div>
           <div className="page-heading__actions">
             <label className="visually-hidden" htmlFor="transaction-month-filter">
