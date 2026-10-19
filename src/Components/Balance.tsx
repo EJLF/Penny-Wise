@@ -13,13 +13,13 @@ const Balance = ({ transactions, periodLabel }: BalanceProps) => {
     <article className="balance-card">
       <div className="balance-card__top">
         <p className="balance-card__label">Total balance</p>
-        <span className="balance-card__icon" aria-hidden="true">
+        {/* <span className="balance-card__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none">
             <rect x="3.5" y="6" width="17" height="13" rx="2.5" stroke="currentColor" strokeWidth="1.7" />
             <path d="M16 14h4.5M7 6V4.8a1.8 1.8 0 0 1 2.2-1.75l10.3 2.3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
             <circle cx="16.3" cy="12.5" r="1" fill="currentColor" />
           </svg>
-        </span>
+        </span> */}
       </div>
       <p className="balance-card__amount">{formatCurrency(total)}</p>
       <div className="balance-card__bottom">
