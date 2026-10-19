@@ -1,0 +1,161 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import Header from './Components/Header'
+import Balance from './Components/Balance'
+import IncomeExpenses from './Components/IncomeExpenses'
+import TransactionList from './Components/TransactionList'
+import AddTransaction from './Components/AddTransaction'
+import type { TransactionMode } from './Components/AddTransaction'
+import type { AppTheme } from './Components/Header'
+import { GlobalProvider } from './context/GlobalState'
+import { useGlobalContext } from './context/useGlobalContext'
+import { useLocalStorage } from './hooks/useLocalStorage'
+import { getTransactionMonth, getTransactionMonthLabel, getTransactionMonthOptions } from './utils/transactionMonths'
+import './App.css'
+
+type DashboardProps = {
+  theme: AppTheme
+  onThemeChange: (theme: AppTheme) => void
+}
+
+function Dashboard({ theme, onThemeChange }: DashboardProps) {
+  const { transactions } = useGlobalContext()
+  const [selectedMonth, setSelectedMonth] = useState('all')
+  const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false)
+  const [transactionMode, setTransactionMode] = useState<TransactionMode>('any')
+  const transactionDialogRef = useRef<HTMLDialogElement>(null)
+  const monthOptions = useMemo(
+    () => getTransactionMonthOptions(transactions),
+    [transactions],
+  )
+  const activeMonth = selectedMonth === 'all' ||
+    monthOptions.some((option) => option.value === selectedMonth)
+    ? selectedMonth
+    : 'all'
+  const filteredTransactions = useMemo(
+    () => activeMonth === 'all'
+      ? transactions
+      : transactions.filter((transaction) => getTransactionMonth(transaction) === activeMonth),
+    [activeMonth, transactions],
+  )
+
+  useEffect(() => {
+    if (isAddTransactionOpen && transactionDialogRef.current && !transactionDialogRef.current.open) {
+      transactionDialogRef.current.showModal()
+    }
+  }, [isAddTransactionOpen])
+
+  const closeAddTransaction = () => {
+    transactionDialogRef.current?.close()
+    setIsAddTransactionOpen(false)
+  }
+
+  const openAddTransaction = (mode: TransactionMode = 'any') => {
+    setTransactionMode(mode)
+    setIsAddTransactionOpen(true)
+  }
+
+  const periodLabel = activeMonth === 'all'
+    ? 'Across all transactions'
+    : `For ${getTransactionMonthLabel(activeMonth)}`
+
+  return (
+    <div className="app-shell" data-theme={theme}>
+      <Header theme={theme} onThemeChange={onThemeChange} />
+      <main className="dashboard">
+        <section className="page-heading" aria-labelledby="page-title">
+          <div>
+            <p className="eyebrow">PERSONAL FINANCE</p>
+            <h1 id="page-title">Your overview</h1>
+            <p className="page-subtitle">A clear picture of where your money stands.</p>
+          </div>
+          <div className="page-heading__actions">
+            <label className="visually-hidden" htmlFor="transaction-month-filter">
+              Filter transactions by month
+            </label>
+            <select
+              id="transaction-month-filter"
+              className="month-filter"
+              value={activeMonth}
+              onChange={(event) => setSelectedMonth(event.target.value)}
+            >
+              <option value="all">All months</option>
+              {monthOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            <button
+              className="btn-add-transaction"
+              type="button"
+              onClick={() => openAddTransaction()}
+              aria-haspopup="dialog"
+              aria-controls="add-transaction-dialog"
+            >
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+              Add transaction
+            </button>
+          </div>
+        </section>
+
+        <section className="overview-grid" aria-label="Account overview">
+          <Balance transactions={filteredTransactions} periodLabel={periodLabel} />
+          <IncomeExpenses
+            transactions={filteredTransactions}
+            onAddIncome={() => openAddTransaction('income')}
+            onAddExpense={() => openAddTransaction('expense')}
+          />
+        </section>
+
+        <section className="content-grid" aria-label="Manage transactions">
+          <TransactionList
+            transactions={filteredTransactions}
+            emptyMessage={activeMonth === 'all'
+              ? 'No transactions yet. Add one to get started.'
+              : 'No transactions for this month.'}
+          />
+        </section>
+        <footer className="dashboard-footer">Your finances, thoughtfully organized.</footer>
+      </main>
+      {isAddTransactionOpen && (
+        <dialog
+          id="add-transaction-dialog"
+          ref={transactionDialogRef}
+          className="transaction-dialog"
+          onClose={() => setIsAddTransactionOpen(false)}
+          onClick={(event) => {
+            const dialog = event.currentTarget
+            const bounds = dialog.getBoundingClientRect()
+            if (
+              event.target === dialog &&
+              (event.clientX < bounds.left ||
+                event.clientX > bounds.right ||
+                event.clientY < bounds.top ||
+                event.clientY > bounds.bottom)
+            ) {
+              closeAddTransaction()
+            }
+          }}
+        >
+          <AddTransaction
+            key={transactionMode}
+            onClose={closeAddTransaction}
+            mode={transactionMode}
+          />
+        </dialog>
+      )}
+    </div>
+  )
+}
+
+function App() {
+  const [theme, setTheme] = useLocalStorage<AppTheme>('smart-expense-tracker-theme', 'green')
+
+  return (
+    <GlobalProvider>
+      <Dashboard theme={theme} onThemeChange={setTheme} />
+    </GlobalProvider>
+  )
+}
+
+export default App
