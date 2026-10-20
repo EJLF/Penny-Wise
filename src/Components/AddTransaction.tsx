@@ -27,23 +27,18 @@ const AddTransaction = ({
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    const parsedAmount = Number(amount)
+    const enteredAmount = Number(amount)
+    const parsedAmount =
+      transactionType === 'expense' ? -enteredAmount : enteredAmount
     const description = formatDescription(text.trim())
 
     if (
       !description ||
-      !amount ||
-      !Number.isFinite(parsedAmount) ||
-      parsedAmount === 0 ||
-      (transactionType === 'income' && parsedAmount < 0) ||
-      (transactionType === 'expense' && parsedAmount > 0)
+      !Number.isFinite(enteredAmount) ||
+      enteredAmount <= 0
     ) {
       setError(
-        transactionType === 'income'
-          ? 'Enter a description and a positive amount.'
-          : transactionType === 'expense'
-            ? 'Enter a description and a negative amount.'
-          : 'Enter a description and a non-zero amount.',
+        'Enter a description and a positive amount.',
       )
       return
     }
@@ -117,7 +112,7 @@ const AddTransaction = ({
             type="text"
             value={text}
             onChange={(event) => setText(formatDescription(event.target.value))}
-            placeholder="e.g.  Weekly groceries"
+            placeholder={transactionType === 'income' ? 'e.g. Salary' : 'e.g.  Weekly groceries'}
             autoComplete="off"
           />
         </div>
@@ -127,17 +122,16 @@ const AddTransaction = ({
             id="transaction-amount"
             type="number"
             step="0.01"
-            min={transactionType === 'income' ? '0.01' : undefined}
-            max={transactionType === 'expense' ? '-0.01' : undefined}
+            min="0.01"
             value={amount}
             onChange={(event) => setAmount(event.target.value)}
-            placeholder={transactionType === 'income' ? 'e.g. 2500.00' : 'e.g. -45.00'}
+            placeholder={transactionType === 'income' ? 'e.g. 1500.00' : 'e.g. 1500.00'}
             inputMode="decimal"
           />
           <p className="form-hint">
             {transactionType === 'income'
-              ? 'Income amounts must be positive.'
-              : 'Expense amounts must be negative.'}
+              ? 'Enter a positive amount.'
+              : 'Enter a positive amount; it will be recorded as an expense.'}
           </p>
         </div>
         {error && <p className="form-error" role="alert">{error}</p>}
