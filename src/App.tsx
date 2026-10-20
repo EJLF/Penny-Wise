@@ -98,18 +98,18 @@ function Dashboard({ theme, onThemeChange }: DashboardProps) {
           <button
             className="page-nav__link"
             type="button"
-            aria-current={activePage === 'dashboard' ? 'page' : undefined}
-            onClick={() => setActivePage('dashboard')}
-          >
-            Dashboard
-          </button>
-          <button
-            className="page-nav__link"
-            type="button"
             aria-current={activePage === 'overview' ? 'page' : undefined}
             onClick={() => setActivePage('overview')}
           >
             Overview
+          </button>
+          <button
+            className="page-nav__link"
+            type="button"
+            aria-current={activePage === 'dashboard' ? 'page' : undefined}
+            onClick={() => setActivePage('dashboard')}
+          >
+            Dashboard
           </button>
         </nav>
         <section className="page-heading" aria-labelledby="page-title">
@@ -185,13 +185,14 @@ function Dashboard({ theme, onThemeChange }: DashboardProps) {
         <button
           className="mobile-bottom-nav__link"
           type="button"
-          aria-label="Dashboard"
-          title="Dashboard"
-          aria-current={activePage === 'dashboard' ? 'page' : undefined}
-          onClick={() => setActivePage('dashboard')}
+          aria-label="Overview"
+          title="Overview"
+          aria-current={activePage === 'overview' ? 'page' : undefined}
+          onClick={() => setActivePage('overview')}
         >
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M4 19V11m5 8V5m5 14v-6m6 6V8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            <path d="m3.5 10 8.5-7 8.5 7v9.5a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1V10Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+            <path d="M9 20.5v-7h6v7" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
           </svg>
         </button>
         <button
@@ -209,14 +210,13 @@ function Dashboard({ theme, onThemeChange }: DashboardProps) {
         <button
           className="mobile-bottom-nav__link"
           type="button"
-          aria-label="Overview"
-          title="Overview"
-          aria-current={activePage === 'overview' ? 'page' : undefined}
-          onClick={() => setActivePage('overview')}
+          aria-label="Dashboard"
+          title="Dashboard"
+          aria-current={activePage === 'dashboard' ? 'page' : undefined}
+          onClick={() => setActivePage('dashboard')}
         >
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="m3.5 10 8.5-7 8.5 7v9.5a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1V10Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-            <path d="M9 20.5v-7h6v7" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+            <path d="M4 19V11m5 8V5m5 14v-6m6 6V8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
           </svg>
         </button>
       </nav>
