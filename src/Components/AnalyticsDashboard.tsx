@@ -394,6 +394,14 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
               <span>Spent in the last six months</span>
               <strong>{formatCurrency(sixMonthExpenses)}</strong>
             </div>
+            <div className="analytics-monthly-details" aria-label="Monthly expenses">
+              {monthlyData.map((month) => (
+                <div className="analytics-monthly-details__row" key={month.key}>
+                  <span className="analytics-monthly-details__month">{month.label}</span>
+                  <strong>{formatCurrency(month.expenses)}</strong>
+                </div>
+              ))}
+            </div>
           </>
         ) : (
           <p className="empty-state">Add dated expenses to see your spending trend.</p>
@@ -480,6 +488,23 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
               <span><i className="analytics-legend__income" />Income</span>
               <span><i className="analytics-legend__expense" />Expenses</span>
             </div>
+            <div className="analytics-monthly-details" aria-label="Monthly income and expenses">
+              {monthlyData.map((month) => (
+                <div className="analytics-monthly-details__row" key={month.key}>
+                  <span className="analytics-monthly-details__month">{month.label}</span>
+                  <span className="analytics-monthly-details__values">
+                    <strong>
+                      <i className="analytics-legend__income" aria-hidden="true" />
+                      {formatCurrency(month.income)}
+                    </strong>
+                    <strong>
+                      <i className="analytics-legend__expense" aria-hidden="true" />
+                      {formatCurrency(month.expenses)}
+                    </strong>
+                  </span>
+                </div>
+              ))}
+            </div>
           </>
         ) : (
           <p className="empty-state">Add dated transactions to compare monthly income and expenses.</p>
@@ -511,6 +536,17 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
             <div className="analytics-chart-summary">
               <span>Net change in the last six months</span>
               <strong>{sixMonthNet >= 0 ? '+' : '−'}{formatCurrency(Math.abs(sixMonthNet))}</strong>
+            </div>
+            <div className="analytics-monthly-details" aria-label="Monthly cumulative savings">
+              {monthlyData.map((month, index) => (
+                <div className="analytics-monthly-details__row" key={month.key}>
+                  <span className="analytics-monthly-details__month">{month.label}</span>
+                  <strong>
+                    {cumulativeNet[index] >= 0 ? '+' : '−'}
+                    {formatCurrency(Math.abs(cumulativeNet[index]))}
+                  </strong>
+                </div>
+              ))}
             </div>
           </>
         ) : (
