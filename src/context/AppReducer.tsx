@@ -2,6 +2,7 @@ export interface Transaction {
   id: string | number
   text: string
   amount: number
+  category?: string
   date?: string
 }
 

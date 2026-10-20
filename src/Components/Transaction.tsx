@@ -22,7 +22,9 @@ const Transaction = ({ transaction }: { transaction: TransactionItem }) => {
       </span>
       <span className="transaction-row__details">
         <span className="transaction-row__name">{transaction.text}</span>
-        <span className="transaction-row__category">{isIncome ? 'Income' : 'Expense'}</span>
+        <span className="transaction-row__category">
+          {transaction.category || (isIncome ? 'Income' : 'Expense')}
+        </span>
       </span>
       <span className="transaction-row__amount">
         {isIncome ? '+' : '−'}{formatCurrency(Math.abs(transaction.amount))}

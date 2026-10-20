@@ -3,6 +3,21 @@ import { useGlobalContext } from '../context/useGlobalContext'
 
 export type TransactionMode = 'any' | 'income' | 'expense'
 
+const categories = {
+  income: ['Freelance', 'Gifts', 'Investments', 'Salary', 'Other'],
+  expense: [
+    'Education',
+    'Entertainment',
+    'Food & Dining',
+    'Healthcare',
+    'Housing',    
+    'Shopping',
+    'Transportation',
+    'Utilities',
+    'Other'
+  ],
+}
+
 type AddTransactionProps = {
   onClose: () => void
   mode: TransactionMode
@@ -15,6 +30,7 @@ const AddTransaction = ({
   const { dispatch } = useGlobalContext()
   const [text, setText] = useState('')
   const [amount, setAmount] = useState('')
+  const [category, setCategory] = useState('')
   const [error, setError] = useState('')
   const [selectedType, setSelectedType] = useState<'income' | 'expense'>(
     mode === 'any' ? 'income' : mode,
@@ -34,11 +50,12 @@ const AddTransaction = ({
 
     if (
       !description ||
+      !category ||
       !Number.isFinite(enteredAmount) ||
       enteredAmount <= 0
     ) {
       setError(
-        'Enter a description and a positive amount.',
+        'Enter a description, choose a category, and enter a positive amount.',
       )
       return
     }
@@ -49,11 +66,13 @@ const AddTransaction = ({
         id: crypto.randomUUID(),
         text: description,
         amount: parsedAmount,
+        category,
         date: new Date().toISOString(),
       },
     })
     setText('')
     setAmount('')
+    setCategory('')
     setError('')
     onClose()
   }
@@ -85,6 +104,7 @@ const AddTransaction = ({
                 checked={selectedType === 'income'}
                 onChange={() => {
                   setSelectedType('income')
+                  setCategory('')
                   setError('')
                 }}
               />
@@ -98,6 +118,7 @@ const AddTransaction = ({
                 checked={selectedType === 'expense'}
                 onChange={() => {
                   setSelectedType('expense')
+                  setCategory('')
                   setError('')
                 }}
               />
@@ -112,9 +133,23 @@ const AddTransaction = ({
             type="text"
             value={text}
             onChange={(event) => setText(formatDescription(event.target.value))}
-            placeholder={transactionType === 'income' ? 'e.g. Salary' : 'e.g.  Weekly groceries'}
+            placeholder={transactionType === 'income' ? 'e.g. Monthly salary' : 'e.g.  Tuition fees'}
             autoComplete="off"
           />
+        </div>
+        <div className="form-control">
+          <label htmlFor="transaction-category">Category</label>
+          <select
+            id="transaction-category"
+            value={category}
+            onChange={(event) => setCategory(event.target.value)}
+            required
+          >
+            <option value="" disabled>Select a category</option>
+            {categories[transactionType].map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
         </div>
         <div className="form-control">
           <label htmlFor="transaction-amount">Amount</label>
