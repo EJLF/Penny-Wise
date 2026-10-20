@@ -424,7 +424,7 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
                 const top = 20
                 const bottom = 194
                 const max = Math.max(1, ...monthlyData.flatMap((month) => [month.income, month.expenses]))
-                const barWidth = 16
+                const barWidth = 20
                 return (
                   <>
                     {Array.from({ length: 5 }, (_, index) => {
@@ -446,21 +446,21 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
                       return (
                         <g key={month.key}>
                           <rect
-                            x={center - barWidth - 2}
+                            x={center - barWidth - 4}
                             y={bottom - incomeHeight}
                             width={barWidth}
                             height={incomeHeight}
-                            rx="3"
+                            rx={barWidth / 2}
                             fill="var(--chart-income)"
                           >
                             <title>{`${month.label} income: ${formatCurrency(month.income)}`}</title>
                           </rect>
                           <rect
-                            x={center + 2}
+                            x={center + 4}
                             y={bottom - expenseHeight}
                             width={barWidth}
                             height={expenseHeight}
-                            rx="3"
+                            rx={barWidth / 2}
                             fill="var(--chart-expense)"
                           >
                             <title>{`${month.label} expenses: ${formatCurrency(month.expenses)}`}</title>
