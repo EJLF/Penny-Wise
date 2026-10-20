@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type KeyboardEvent } from 'react'
 import type { Transaction } from '../context/AppReducer'
 import { formatCurrency } from '../utils/formatCurrency'
 import {
@@ -23,6 +23,15 @@ type ExpenseSlice = {
   category: string
   amount: number
 }
+
+const analyticsTabs = [
+  { id: 'expenses', label: 'Expenses' },
+  { id: 'trend', label: 'Spending trend' },
+  { id: 'comparison', label: 'Income vs. expenses' },
+  { id: 'savings', label: 'Savings' },
+] as const
+
+type AnalyticsTab = typeof analyticsTabs[number]['id']
 
 const expenseChartColors = [
   '#d4a017', // Gold
@@ -116,40 +125,55 @@ const LineChart = ({ data, values, color, label, allowNegative = false }: LineCh
     y: bottom - (value - min) / range * (bottom - top),
     value,
   }))
-  const path = points.map((point, index) =>
-    `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`,
-  ).join(' ')
+  const path = points.reduce((commands, point, index) => {
+    if (index === 0) {
+      return `M ${point.x} ${point.y}`
+    }
+
+    const previous = points[index - 1]
+    const beforePrevious = points[index - 2] ?? previous
+    const next = points[index + 1] ?? point
+    const control1X = previous.x + (point.x - beforePrevious.x) / 6
+    const control1Y = previous.y + (point.y - beforePrevious.y) / 6
+    const control2X = point.x - (next.x - previous.x) / 6
+    const control2Y = point.y - (next.y - previous.y) / 6
+
+    return `${commands} C ${control1X} ${control1Y}, ${control2X} ${control2Y}, ${point.x} ${point.y}`
+  }, '')
 
   return (
-    <svg className="analytics-chart" viewBox="0 0 600 240" role="img" aria-label={label}>
-      <title>{label}</title>
-      {Array.from({ length: 5 }, (_, index) => {
-        const value = min + range * (4 - index) / 4
-        const y = top + (bottom - top) * index / 4
-        return (
-          <g key={index}>
-            <line className="analytics-chart__grid" x1={left} x2={right} y1={y} y2={y} />
-            <text className="analytics-chart__axis-label" x={left - 10} y={y + 4} textAnchor="end">
-              {compactCurrency(value)}
+    <div className="analytics-chart-scroll">
+      <svg className="analytics-chart" viewBox="0 0 600 240" role="img" aria-label={label}>
+        <title>{label}</title>
+        {Array.from({ length: 5 }, (_, index) => {
+          const value = min + range * (4 - index) / 4
+          const y = top + (bottom - top) * index / 4
+          return (
+            <g key={index}>
+              <line className="analytics-chart__grid" x1={left} x2={right} y1={y} y2={y} />
+              <text className="analytics-chart__axis-label" x={left - 10} y={y + 4} textAnchor="end">
+                {compactCurrency(value)}
+              </text>
+            </g>
+          )
+        })}
+        <path d={path} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        {points.map((point, index) => (
+          <g key={data[index].key}>
+            <circle cx={point.x} cy={point.y} r="5" fill={color} stroke="#fff" strokeWidth="2" />
+            <text className="analytics-chart__month-label" x={point.x} y={bottom + 23} textAnchor="middle">
+              {data[index].label}
             </text>
+            <title>{`${data[index].label}: ${formatCurrency(point.value)}`}</title>
           </g>
-        )
-      })}
-      <path d={path} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-      {points.map((point, index) => (
-        <g key={data[index].key}>
-          <circle cx={point.x} cy={point.y} r="5" fill={color} stroke="#fff" strokeWidth="2" />
-          <text className="analytics-chart__month-label" x={point.x} y={bottom + 23} textAnchor="middle">
-            {data[index].label}
-          </text>
-          <title>{`${data[index].label}: ${formatCurrency(point.value)}`}</title>
-        </g>
-      ))}
-    </svg>
+        ))}
+      </svg>
+    </div>
   )
 }
 
 const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
+  const [activeTab, setActiveTab] = useState<AnalyticsTab>('expenses')
   const [expenseMonth, setExpenseMonth] = useState('all')
   const monthlyData = getMonthlyData(transactions)
   const expenseMonthOptions = Array.from(new Set(
@@ -189,10 +213,64 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
       { total: startingTotal, values: [] },
     ).values
   })()
+  const sixMonthExpenses = monthlyData.reduce((total, month) => total + month.expenses, 0)
+  const sixMonthNet = monthlyData.reduce((total, month) => total + month.net, 0)
+
+  const handleTabKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const currentIndex = analyticsTabs.findIndex((tab) => tab.id === activeTab)
+    let nextIndex: number
+
+    if (event.key === 'ArrowRight') {
+      nextIndex = (currentIndex + 1) % analyticsTabs.length
+    } else if (event.key === 'ArrowLeft') {
+      nextIndex = (currentIndex - 1 + analyticsTabs.length) % analyticsTabs.length
+    } else if (event.key === 'Home') {
+      nextIndex = 0
+    } else if (event.key === 'End') {
+      nextIndex = analyticsTabs.length - 1
+    } else {
+      return
+    }
+
+    event.preventDefault()
+    setActiveTab(analyticsTabs[nextIndex].id)
+    event.currentTarget
+      .querySelector<HTMLButtonElement>(`[data-analytics-tab="${analyticsTabs[nextIndex].id}"]`)
+      ?.focus()
+  }
 
   return (
-    <section className="analytics-grid" aria-label="Financial analytics">
-      <article className="panel analytics-panel">
+    <section
+      className="analytics-dashboard"
+      aria-label="Financial analytics"
+      data-active-tab={activeTab}
+    >
+      <div className="analytics-tabs" role="tablist" aria-label="Analytics charts" onKeyDown={handleTabKeyDown}>
+        {analyticsTabs.map((tab) => (
+          <button
+            className="analytics-tabs__button"
+            key={tab.id}
+            id={`analytics-tab-${tab.id}`}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            aria-controls={`analytics-panel-${tab.id}`}
+            tabIndex={activeTab === tab.id ? 0 : -1}
+            data-analytics-tab={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      <div className="analytics-grid">
+      <article
+        className="panel analytics-panel"
+        id="analytics-panel-expenses"
+        role="tabpanel"
+        aria-labelledby="analytics-tab-expenses"
+        data-analytics-panel="expenses"
+      >
         <div className="panel__heading">
           <div>
             <h2 className="panel__title">Expense breakdown</h2>
@@ -217,12 +295,16 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
                 <option key={month} value={month}>{getTransactionMonthLabel(month)}</option>
               ))}
             </select>
-            <span className="analytics-panel__total">{formatCurrency(totalExpenses)}</span>
           </div>
         </div>
         {expenseSlices.length > 0 ? (
           <div className="expense-breakdown">
-            <svg className="expense-breakdown__chart" viewBox="0 0 180 180" role="img" aria-label="Expense breakdown pie chart">
+            <svg
+              className="expense-breakdown__chart"
+              viewBox="0 0 180 180"
+              role="img"
+              aria-label={`Expense breakdown pie chart. Total expense: ${formatCurrency(totalExpenses)}`}
+            >
               <title>Expense breakdown by category</title>
               <g transform="rotate(-90 90 90)">
                 {expenseSlices.map((slice, index) => {
@@ -252,6 +334,12 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
                   )
                 })}
               </g>
+              <text className="expense-breakdown__center-label" x="90" y="86" textAnchor="middle">
+                Total expense
+              </text>
+              <text className="expense-breakdown__center-total" x="90" y="103" textAnchor="middle">
+                {formatCurrency(totalExpenses)}
+              </text>
             </svg>
             <ul className="expense-breakdown__legend">
               {expenseSlices.map((slice, index) => (
@@ -281,7 +369,13 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
         )}
       </article>
 
-      <article className="panel analytics-panel">
+      <article
+        className="panel analytics-panel"
+        id="analytics-panel-trend"
+        role="tabpanel"
+        aria-labelledby="analytics-tab-trend"
+        data-analytics-panel="trend"
+      >
         <div className="panel__heading">
           <div>
             <h2 className="panel__title">Monthly spending trend</h2>
@@ -289,94 +383,116 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
           </div>
         </div>
         {monthlyData.some((month) => month.expenses > 0) ? (
-          <LineChart
-            data={monthlyData}
-            values={monthlyData.map((month) => month.expenses)}
-            color="var(--chart-expense)"
-            label="Monthly spending trend for the last six months"
-          />
+          <>
+            <LineChart
+              data={monthlyData}
+              values={monthlyData.map((month) => month.expenses)}
+              color="var(--accent)"
+              label="Monthly spending trend for the last six months"
+            />
+            <div className="analytics-chart-summary">
+              <span>Spent in the last six months</span>
+              <strong>{formatCurrency(sixMonthExpenses)}</strong>
+            </div>
+          </>
         ) : (
           <p className="empty-state">Add dated expenses to see your spending trend.</p>
         )}
       </article>
 
-      <article className="panel analytics-panel">
+      <article
+        className="panel analytics-panel"
+        id="analytics-panel-comparison"
+        role="tabpanel"
+        aria-labelledby="analytics-tab-comparison"
+        data-analytics-panel="comparison"
+      >
         <div className="panel__heading">
           <div>
             <h2 className="panel__title">Income vs expenses</h2>
             <p className="panel__subtitle">Monthly totals over the last six months</p>
           </div>
-          <div className="analytics-legend" aria-label="Chart legend">
-            <span><i className="analytics-legend__income" />Income</span>
-            <span><i className="analytics-legend__expense" />Expenses</span>
-          </div>
         </div>
         {hasMonthlyTransactions ? (
-          <svg className="analytics-chart" viewBox="0 0 600 240" role="img" aria-label="Monthly income compared with expenses">
-            <title>Monthly income vs expenses</title>
-            {(() => {
-              const left = 62
-              const right = 580
-              const top = 20
-              const bottom = 194
-              const max = Math.max(1, ...monthlyData.flatMap((month) => [month.income, month.expenses]))
-              const barWidth = 16
-              return (
-                <>
-                  {Array.from({ length: 5 }, (_, index) => {
-                    const value = max * (4 - index) / 4
-                    const y = top + (bottom - top) * index / 4
-                    return (
-                      <g key={index}>
-                        <line className="analytics-chart__grid" x1={left} x2={right} y1={y} y2={y} />
-                        <text className="analytics-chart__axis-label" x={left - 10} y={y + 4} textAnchor="end">
-                          {compactCurrency(value)}
-                        </text>
-                      </g>
-                    )
-                  })}
-                  {monthlyData.map((month, index) => {
-                    const center = left + (right - left) * (index + 0.5) / monthlyData.length
-                    const incomeHeight = month.income / max * (bottom - top)
-                    const expenseHeight = month.expenses / max * (bottom - top)
-                    return (
-                      <g key={month.key}>
-                        <rect
-                          x={center - barWidth - 2}
-                          y={bottom - incomeHeight}
-                          width={barWidth}
-                          height={incomeHeight}
-                          rx="3"
-                          fill="var(--chart-income)"
-                        >
-                          <title>{`${month.label} income: ${formatCurrency(month.income)}`}</title>
-                        </rect>
-                        <rect
-                          x={center + 2}
-                          y={bottom - expenseHeight}
-                          width={barWidth}
-                          height={expenseHeight}
-                          rx="3"
-                          fill="var(--chart-expense)"
-                        >
-                          <title>{`${month.label} expenses: ${formatCurrency(month.expenses)}`}</title>
-                        </rect>
-                        <text className="analytics-chart__month-label" x={center} y={bottom + 23} textAnchor="middle">
-                          {month.label}
-                        </text>
-                      </g>
-                    )
-                  })}
-                </>
-              )
-            })()}
-          </svg>
+          <>
+            <div className="analytics-chart-scroll">
+              <svg className="analytics-chart" viewBox="0 0 600 240" role="img" aria-label="Monthly income compared with expenses">
+              <title>Monthly income vs expenses</title>
+              {(() => {
+                const left = 62
+                const right = 580
+                const top = 20
+                const bottom = 194
+                const max = Math.max(1, ...monthlyData.flatMap((month) => [month.income, month.expenses]))
+                const barWidth = 16
+                return (
+                  <>
+                    {Array.from({ length: 5 }, (_, index) => {
+                      const value = max * (4 - index) / 4
+                      const y = top + (bottom - top) * index / 4
+                      return (
+                        <g key={index}>
+                          <line className="analytics-chart__grid" x1={left} x2={right} y1={y} y2={y} />
+                          <text className="analytics-chart__axis-label" x={left - 10} y={y + 4} textAnchor="end">
+                            {compactCurrency(value)}
+                          </text>
+                        </g>
+                      )
+                    })}
+                    {monthlyData.map((month, index) => {
+                      const center = left + (right - left) * (index + 0.5) / monthlyData.length
+                      const incomeHeight = month.income / max * (bottom - top)
+                      const expenseHeight = month.expenses / max * (bottom - top)
+                      return (
+                        <g key={month.key}>
+                          <rect
+                            x={center - barWidth - 2}
+                            y={bottom - incomeHeight}
+                            width={barWidth}
+                            height={incomeHeight}
+                            rx="3"
+                            fill="var(--chart-income)"
+                          >
+                            <title>{`${month.label} income: ${formatCurrency(month.income)}`}</title>
+                          </rect>
+                          <rect
+                            x={center + 2}
+                            y={bottom - expenseHeight}
+                            width={barWidth}
+                            height={expenseHeight}
+                            rx="3"
+                            fill="var(--chart-expense)"
+                          >
+                            <title>{`${month.label} expenses: ${formatCurrency(month.expenses)}`}</title>
+                          </rect>
+                          <text className="analytics-chart__month-label" x={center} y={bottom + 23} textAnchor="middle">
+                            {month.label}
+                          </text>
+                        </g>
+                      )
+                    })}
+                  </>
+                )
+              })()}
+              </svg>
+            </div>
+            <div className="analytics-legend" aria-label="Chart legend">
+              <span><i className="analytics-legend__income" />Income</span>
+              <span><i className="analytics-legend__expense" />Expenses</span>
+            </div>
+          </>
         ) : (
           <p className="empty-state">Add dated transactions to compare monthly income and expenses.</p>
         )}
       </article>
 
-      <article className="panel analytics-panel">
+      <article
+        className="panel analytics-panel"
+        id="analytics-panel-savings"
+        role="tabpanel"
+        aria-labelledby="analytics-tab-savings"
+        data-analytics-panel="savings"
+      >
         <div className="panel__heading">
           <div>
             <h2 className="panel__title">Savings growth</h2>
@@ -384,17 +500,24 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
           </div>
         </div>
         {datedTransactions.length > 0 ? (
-          <LineChart
-            data={monthlyData}
-            values={cumulativeNet}
-            color="var(--chart-savings)"
-            label="Cumulative net savings growth over the last six months"
-            allowNegative
-          />
+          <>
+            <LineChart
+              data={monthlyData}
+              values={cumulativeNet}
+              color="var(--accent)"
+              label="Cumulative net savings growth over the last six months"
+              allowNegative
+            />
+            <div className="analytics-chart-summary">
+              <span>Net change in the last six months</span>
+              <strong>{sixMonthNet >= 0 ? '+' : '−'}{formatCurrency(Math.abs(sixMonthNet))}</strong>
+            </div>
+          </>
         ) : (
           <p className="empty-state">Add dated transactions to see your savings growth.</p>
         )}
       </article>
+      </div>
     </section>
   )
 }
