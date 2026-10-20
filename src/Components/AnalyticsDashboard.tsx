@@ -2,6 +2,7 @@ import { useState, type KeyboardEvent } from 'react'
 import type { Transaction } from '../context/AppReducer'
 import { formatCurrency } from '../utils/formatCurrency'
 import {
+  getCurrentTransactionMonth,
   getTransactionMonth,
   getTransactionMonthLabel,
 } from '../utils/transactionMonths'
@@ -45,7 +46,7 @@ const expenseChartColors = [
 const getMonthlyData = (transactions: Transaction[]): MonthlyData[] => {
   const now = new Date()
   const months = Array.from({ length: 6 }, (_, index) => {
-    const month = new Date(now.getFullYear(), now.getMonth() - 5 + index, 1)
+    const month = new Date(now.getFullYear(), now.getMonth() - 4 + index, 1)
     const key = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}`
     return {
       key,
@@ -106,7 +107,7 @@ const compactCurrency = (amount: number) => new Intl.NumberFormat(undefined, {
 
 type LineChartProps = {
   data: MonthlyData[]
-  values: number[]
+  values: Array<number | null>
   color: string
   label: string
   allowNegative?: boolean
@@ -117,14 +118,16 @@ const LineChart = ({ data, values, color, label, allowNegative = false }: LineCh
   const right = 580
   const top = 20
   const bottom = 194
-  const min = allowNegative ? Math.min(0, ...values) : 0
-  const max = Math.max(1, ...values)
+  const plottedValues = values.filter((value): value is number => value !== null)
+  const min = allowNegative ? Math.min(0, ...plottedValues) : 0
+  const max = Math.max(1, ...plottedValues)
   const range = max - min || 1
-  const points = values.map((value, index) => ({
-    x: left + (right - left) * index / Math.max(values.length - 1, 1),
+  const points = values.flatMap((value, index) => value === null ? [] : [{
+    x: left + (right - left) * index / Math.max(data.length - 1, 1),
     y: bottom - (value - min) / range * (bottom - top),
     value,
-  }))
+    monthIndex: index,
+  }])
   const path = points.reduce((commands, point, index) => {
     if (index === 0) {
       return `M ${point.x} ${point.y}`
@@ -158,14 +161,22 @@ const LineChart = ({ data, values, color, label, allowNegative = false }: LineCh
           )
         })}
         <path d={path} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-        {points.map((point, index) => (
-          <g key={data[index].key}>
+        {points.map((point) => (
+          <g key={data[point.monthIndex].key}>
             <circle cx={point.x} cy={point.y} r="5" fill={color} stroke="#fff" strokeWidth="2" />
-            <text className="analytics-chart__month-label" x={point.x} y={bottom + 23} textAnchor="middle">
-              {data[index].label}
-            </text>
-            <title>{`${data[index].label}: ${formatCurrency(point.value)}`}</title>
+            <title>{`${data[point.monthIndex].label}: ${formatCurrency(point.value)}`}</title>
           </g>
+        ))}
+        {data.map((month, index) => (
+          <text
+            className="analytics-chart__month-label"
+            key={month.key}
+            x={left + (right - left) * index / Math.max(data.length - 1, 1)}
+            y={bottom + 23}
+            textAnchor="middle"
+          >
+            {month.label}
+          </text>
         ))}
       </svg>
     </div>
@@ -175,7 +186,9 @@ const LineChart = ({ data, values, color, label, allowNegative = false }: LineCh
 const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('expenses')
   const [expenseMonth, setExpenseMonth] = useState('all')
+  const currentMonth = getCurrentTransactionMonth()
   const monthlyData = getMonthlyData(transactions)
+  const currentMonths = monthlyData.filter((month) => month.key <= currentMonth)
   const expenseMonthOptions = Array.from(new Set(
     transactions
       .filter((transaction) => transaction.amount < 0)
@@ -197,7 +210,7 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
   const datedTransactions = transactions.filter(
     (transaction) => getTransactionMonth(transaction) !== 'undated',
   )
-  const hasMonthlyTransactions = monthlyData.some((month) => month.count > 0)
+  const hasMonthlyTransactions = currentMonths.some((month) => month.count > 0)
   const cumulativeNet = (() => {
     const firstVisibleMonth = monthlyData[0].key
     const startingTotal = datedTransactions.reduce((sum, transaction) => {
@@ -205,16 +218,20 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
         ? sum + transaction.amount
         : sum
     }, 0)
-    return monthlyData.reduce<{ total: number; values: number[] }>(
+    return monthlyData.reduce<{ total: number; values: Array<number | null> }>(
       (result, month) => {
+        if (month.key > currentMonth) {
+          return { total: result.total, values: [...result.values, null] }
+        }
+
         const total = result.total + month.net
         return { total, values: [...result.values, total] }
       },
       { total: startingTotal, values: [] },
     ).values
   })()
-  const sixMonthExpenses = monthlyData.reduce((total, month) => total + month.expenses, 0)
-  const sixMonthNet = monthlyData.reduce((total, month) => total + month.net, 0)
+  const sixMonthExpenses = currentMonths.reduce((total, month) => total + month.expenses, 0)
+  const sixMonthNet = currentMonths.reduce((total, month) => total + month.net, 0)
 
   const handleTabKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const currentIndex = analyticsTabs.findIndex((tab) => tab.id === activeTab)
@@ -382,11 +399,13 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
             <p className="panel__subtitle">Expenses over the last six months</p>
           </div>
         </div>
-        {monthlyData.some((month) => month.expenses > 0) ? (
+        {currentMonths.some((month) => month.expenses > 0) ? (
           <>
             <LineChart
               data={monthlyData}
-              values={monthlyData.map((month) => month.expenses)}
+              values={monthlyData.map((month) =>
+                month.key > currentMonth ? null : month.expenses,
+              )}
               color="var(--accent)"
               label="Monthly spending trend for the last six months"
             />
@@ -395,7 +414,7 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
               <strong>{formatCurrency(sixMonthExpenses)}</strong>
             </div>
             <div className="analytics-monthly-details" aria-label="Monthly expenses">
-              {monthlyData.map((month) => (
+              {currentMonths.map((month) => (
                 <div className="analytics-monthly-details__row" key={month.key}>
                   <span className="analytics-monthly-details__month">{month.label}</span>
                   <strong>{formatCurrency(month.expenses)}</strong>
@@ -453,7 +472,8 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
                       const expenseHeight = month.expenses / max * (bottom - top)
                       return (
                         <g key={month.key}>
-                          <rect
+                          {month.key <= currentMonth && (
+                            <rect
                             x={center - barWidth - 4}
                             y={bottom - incomeHeight}
                             width={barWidth}
@@ -462,8 +482,10 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
                             fill="var(--chart-income)"
                           >
                             <title>{`${month.label} income: ${formatCurrency(month.income)}`}</title>
-                          </rect>
-                          <rect
+                            </rect>
+                          )}
+                          {month.key <= currentMonth && (
+                            <rect
                             x={center + 4}
                             y={bottom - expenseHeight}
                             width={barWidth}
@@ -472,7 +494,8 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
                             fill="var(--chart-expense)"
                           >
                             <title>{`${month.label} expenses: ${formatCurrency(month.expenses)}`}</title>
-                          </rect>
+                            </rect>
+                          )}
                           <text className="analytics-chart__month-label" x={center} y={bottom + 23} textAnchor="middle">
                             {month.label}
                           </text>
@@ -489,7 +512,7 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
               <span><i className="analytics-legend__expense" />Expenses</span>
             </div>
             <div className="analytics-monthly-details" aria-label="Monthly income and expenses">
-              {monthlyData.map((month) => (
+              {currentMonths.map((month) => (
                 <div className="analytics-monthly-details__row" key={month.key}>
                   <span className="analytics-monthly-details__month">{month.label}</span>
                   <span className="analytics-monthly-details__values">
@@ -538,15 +561,18 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
               <strong>{sixMonthNet >= 0 ? '+' : '−'}{formatCurrency(Math.abs(sixMonthNet))}</strong>
             </div>
             <div className="analytics-monthly-details" aria-label="Monthly cumulative savings">
-              {monthlyData.map((month, index) => (
+              {currentMonths.map((month) => {
+                const index = monthlyData.findIndex((item) => item.key === month.key)
+                return (
                 <div className="analytics-monthly-details__row" key={month.key}>
                   <span className="analytics-monthly-details__month">{month.label}</span>
                   <strong>
-                    {cumulativeNet[index] >= 0 ? '+' : '−'}
-                    {formatCurrency(Math.abs(cumulativeNet[index]))}
+                    {(cumulativeNet[index] ?? 0) >= 0 ? '+' : '−'}
+                    {formatCurrency(Math.abs(cumulativeNet[index] ?? 0))}
                   </strong>
                 </div>
-              ))}
+                )
+              })}
             </div>
           </>
         ) : (
