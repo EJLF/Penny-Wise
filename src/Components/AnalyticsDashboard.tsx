@@ -25,12 +25,12 @@ type ExpenseSlice = {
 }
 
 const expenseChartColors = [
-  '#8057c7',
-  '#16876c',
-  '#3478c8',
-  '#c76b25',
-  '#c34f70',
-  '#6d8793',
+  '#d4a017', // Gold
+  '#0891b2', // Deep Cyan
+  '#65a30d', // Olive Lime
+  '#eab308', // Crimson
+  '#7c6f64', // Taupe
+  '#475569', // Slate
 ]
 
 const getMonthlyData = (transactions: Transaction[]): MonthlyData[] => {
@@ -240,7 +240,9 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
                       cy="90"
                       r="64"
                       fill="none"
-                      stroke={expenseChartColors[index % expenseChartColors.length]}
+                      stroke={index === 0
+                        ? 'var(--accent)'
+                        : expenseChartColors[index % expenseChartColors.length]}
                       strokeWidth="28"
                       strokeDasharray={`${segmentLength} ${circumference}`}
                       strokeDashoffset={-offset / totalExpenses * circumference}
@@ -257,7 +259,11 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
                   <span className="expense-breakdown__name">
                     <span
                       className="expense-breakdown__swatch"
-                      style={{ backgroundColor: expenseChartColors[index % expenseChartColors.length] }}
+                      style={{
+                        backgroundColor: index === 0
+                          ? 'var(--accent)'
+                          : expenseChartColors[index % expenseChartColors.length],
+                      }}
                       aria-hidden="true"
                     />
                     <span>{slice.category}</span>

@@ -125,18 +125,7 @@ const AddTransaction = ({
               Expense
             </label>
           </fieldset>
-        )}
-        <div className="form-control">
-          <label htmlFor="transaction-description">Description</label>
-          <input
-            id="transaction-description"
-            type="text"
-            value={text}
-            onChange={(event) => setText(formatDescription(event.target.value))}
-            placeholder={transactionType === 'income' ? 'e.g. Monthly salary' : 'e.g.  Tuition fees'}
-            autoComplete="off"
-          />
-        </div>
+        )}        
         <div className="form-control">
           <label htmlFor="transaction-category">Category</label>
           <select
@@ -150,6 +139,17 @@ const AddTransaction = ({
               <option key={option} value={option}>{option}</option>
             ))}
           </select>
+        </div>
+        <div className="form-control">
+          <label htmlFor="transaction-description">Description</label>
+          <input
+            id="transaction-description"
+            type="text"
+            value={text}
+            onChange={(event) => setText(formatDescription(event.target.value))}
+            placeholder={transactionType === 'income' ? 'e.g. Monthly salary' : 'e.g.  Tuition fees'}
+            autoComplete="off"
+          />
         </div>
         <div className="form-control">
           <label htmlFor="transaction-amount">Amount</label>
