@@ -24,7 +24,14 @@ type ExpenseSlice = {
   amount: number
 }
 
-const chartColors = ['#16876c', '#3478c8', '#8057c7', '#c76b25', '#c34f70', '#6d8793']
+const expenseChartColors = [
+  '#8057c7',
+  '#16876c',
+  '#3478c8',
+  '#c76b25',
+  '#c34f70',
+  '#6d8793',
+]
 
 const getMonthlyData = (transactions: Transaction[]): MonthlyData[] => {
   const now = new Date()
@@ -233,7 +240,7 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
                       cy="90"
                       r="64"
                       fill="none"
-                      stroke={chartColors[index % chartColors.length]}
+                      stroke={expenseChartColors[index % expenseChartColors.length]}
                       strokeWidth="28"
                       strokeDasharray={`${segmentLength} ${circumference}`}
                       strokeDashoffset={-offset / totalExpenses * circumference}
@@ -250,7 +257,7 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
                   <span className="expense-breakdown__name">
                     <span
                       className="expense-breakdown__swatch"
-                      style={{ backgroundColor: chartColors[index % chartColors.length] }}
+                      style={{ backgroundColor: expenseChartColors[index % expenseChartColors.length] }}
                       aria-hidden="true"
                     />
                     <span>{slice.category}</span>
@@ -279,7 +286,7 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
           <LineChart
             data={monthlyData}
             values={monthlyData.map((month) => month.expenses)}
-            color="#d45d59"
+            color="var(--chart-expense)"
             label="Monthly spending trend for the last six months"
           />
         ) : (
@@ -334,7 +341,7 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
                           width={barWidth}
                           height={incomeHeight}
                           rx="3"
-                          fill="#16876c"
+                          fill="var(--chart-income)"
                         >
                           <title>{`${month.label} income: ${formatCurrency(month.income)}`}</title>
                         </rect>
@@ -344,7 +351,7 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
                           width={barWidth}
                           height={expenseHeight}
                           rx="3"
-                          fill="#d45d59"
+                          fill="var(--chart-expense)"
                         >
                           <title>{`${month.label} expenses: ${formatCurrency(month.expenses)}`}</title>
                         </rect>
@@ -374,7 +381,7 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
           <LineChart
             data={monthlyData}
             values={cumulativeNet}
-            color="#3478c8"
+            color="var(--chart-savings)"
             label="Cumulative net savings growth over the last six months"
             allowNegative
           />
