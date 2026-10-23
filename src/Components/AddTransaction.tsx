@@ -18,6 +18,19 @@ const categories = {
   ],
 }
 
+const getTodayDate = () => {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const toLocalDateISOString = (dateValue: string) => {
+  const [year, month, day] = dateValue.split('-').map(Number)
+  return new Date(year, month - 1, day).toISOString()
+}
+
 type AddTransactionProps = {
   onClose: () => void
   mode: TransactionMode
@@ -31,6 +44,7 @@ const AddTransaction = ({
   const [text, setText] = useState('')
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('')
+  const [date, setDate] = useState(getTodayDate)
   const [error, setError] = useState('')
   const [selectedType, setSelectedType] = useState<'income' | 'expense'>(
     mode === 'any' ? 'income' : mode,
@@ -67,12 +81,13 @@ const AddTransaction = ({
         text: description,
         amount: parsedAmount,
         category,
-        date: new Date().toISOString(),
+        date: toLocalDateISOString(date || getTodayDate()),
       },
     })
     setText('')
     setAmount('')
     setCategory('')
+    setDate(getTodayDate())
     setError('')
     onClose()
   }
@@ -149,6 +164,15 @@ const AddTransaction = ({
             onChange={(event) => setText(formatDescription(event.target.value))}
             placeholder={transactionType === 'income' ? 'e.g. Monthly salary' : 'e.g.  Tuition fees'}
             autoComplete="off"
+          />
+        </div>
+        <div className="form-control">
+          <label htmlFor="transaction-date">Date</label>
+          <input
+            id="transaction-date"
+            type="date"
+            value={date}
+            onChange={(event) => setDate(event.target.value)}
           />
         </div>
         <div className="form-control">
