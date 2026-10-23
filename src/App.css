@@ -744,7 +744,8 @@ input:focus-visible {
   display: block;
   width: 100%;
   min-width: 0;
-  height: 242px;
+  height: auto;
+  aspect-ratio: 3 / 2;
   margin-top: 12px;
 }
 
@@ -1607,14 +1608,16 @@ input:focus-visible {
   }
 
   .analytics-chart {
-    width: 440px;
-    min-width: 440px;
-    height: 220px;
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    aspect-ratio: 3 / 2;
   }
 
   .analytics-chart-scroll {
     margin-right: -3px;
     padding-bottom: 5px;
+    overflow-x: hidden;
   }
 
   .analytics-panel .analytics-legend {

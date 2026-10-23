@@ -114,8 +114,8 @@ type LineChartProps = {
 }
 
 const LineChart = ({ data, values, color, label, allowNegative = false }: LineChartProps) => {
-  const left = 62
-  const right = 580
+  const left = 42
+  const right = 350
   const top = 20
   const bottom = 194
   const plottedValues = values.filter((value): value is number => value !== null)
@@ -146,7 +146,7 @@ const LineChart = ({ data, values, color, label, allowNegative = false }: LineCh
 
   return (
     <div className="analytics-chart-scroll">
-      <svg className="analytics-chart" viewBox="0 0 600 240" role="img" aria-label={label}>
+      <svg className="analytics-chart" viewBox="0 0 360 240" role="img" aria-label={label}>
         <title>{label}</title>
         {Array.from({ length: 5 }, (_, index) => {
           const value = min + range * (4 - index) / 4
@@ -465,15 +465,15 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
         {hasMonthlyTransactions ? (
           <>
             <div className="analytics-chart-scroll">
-              <svg className="analytics-chart" viewBox="0 0 600 240" role="img" aria-label="Monthly income compared with expenses">
+              <svg className="analytics-chart" viewBox="0 0 360 240" role="img" aria-label="Monthly income compared with expenses">
               <title>Monthly income vs expenses</title>
               {(() => {
-                const left = 62
-                const right = 580
+                const left = 42
+                const right = 350
                 const top = 20
                 const bottom = 194
                 const max = Math.max(1, ...monthlyData.flatMap((month) => [month.income, month.expenses]))
-                const barWidth = 20
+                const barWidth = 12
                 return (
                   <>
                     {Array.from({ length: 5 }, (_, index) => {
