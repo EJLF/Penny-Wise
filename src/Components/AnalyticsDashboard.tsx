@@ -274,9 +274,31 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
             aria-controls={`analytics-panel-${tab.id}`}
             tabIndex={activeTab === tab.id ? 0 : -1}
             data-analytics-tab={tab.id}
+            aria-label={tab.label}
+            title={tab.label}
             onClick={() => setActiveTab(tab.id)}
           >
-            {tab.label}
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              {tab.id === 'expenses' && (
+                <>
+                  <path d="M12 3v9h9A9 9 0 1 1 12 3Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+                  <path d="M15 3.5A9 9 0 0 1 20.5 9H15V3.5Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+                </>
+              )}
+              {tab.id === 'trend' && (
+                <path d="m3.5 17 5-5 3.5 3 8.5-9M15.5 6H20v4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              )}
+              {tab.id === 'comparison' && (
+                <path d="M5 20V11m7 9V4m7 16v-6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+              )}
+              {tab.id === 'savings' && (
+                <>
+                  <path d="M4 15.5c0-3.6 3.3-6.5 8-6.5s8 2.9 8 6.5-3.3 5.5-8 5.5-8-1.9-8-5.5Z" stroke="currentColor" strokeWidth="1.8" />
+                  <path d="M8 9V5l4 2 4-2v4m-4 4v5m-2.5-2.5h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </>
+              )}
+            </svg>
+            <span className="visually-hidden">{tab.label}</span>
           </button>
         ))}
       </div>
