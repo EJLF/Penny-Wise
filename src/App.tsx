@@ -5,6 +5,8 @@ import IncomeExpenses from './Components/IncomeExpenses'
 import TransactionList from './Components/TransactionList'
 import AnalyticsDashboard from './Components/AnalyticsDashboard'
 import LiquidityDashboard from './Components/LiquidityDashboard'
+import ReminderDashboard, { ReminderPaymentDialog, ReminderPopup } from './Components/Reminders'
+import type { Reminder } from './Components/Reminders'
 import AddTransaction from './Components/AddTransaction'
 import type { TransactionMode } from './Components/AddTransaction'
 import type { AppTheme } from './Components/Header'
@@ -24,15 +26,69 @@ type DashboardProps = {
   onThemeChange: (theme: AppTheme) => void
 }
 
-type Page = 'overview' | 'dashboard' | 'liquidity'
+type Page = 'overview' | 'dashboard' | 'liquidity' | 'reminders'
+
+const getLocalDateKey = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+
+const getNextReminderDate = (
+  dueDate: string,
+  recurrence: NonNullable<Reminder['recurrence']>,
+  today: string,
+  recurrenceDay?: number,
+) => {
+  const [year, month, day] = dueDate.split('-').map(Number)
+  const [todayYear, todayMonth, todayDay] = today.split('-').map(Number)
+  const baseDate = new Date(year, month - 1, day)
+  const nowDate = new Date(todayYear, todayMonth - 1, todayDay)
+  const baseDay = recurrenceDay ?? baseDate.getDate()
+  let occurrences = 1
+  let nextDate: Date
+
+  if (recurrence === 'daily' || recurrence === 'weekly') {
+    const daysBetween = Math.floor(
+      (Date.UTC(todayYear, todayMonth - 1, todayDay) - Date.UTC(year, month - 1, day)) /
+      86_400_000,
+    )
+    const daysPerOccurrence = recurrence === 'daily' ? 1 : 7
+    occurrences = Math.max(1, Math.floor(daysBetween / daysPerOccurrence) + 1)
+    nextDate = new Date(year, month - 1, day + occurrences * daysPerOccurrence)
+  } else if (recurrence === 'monthly') {
+    const monthsBetween = (todayYear - year) * 12 + todayMonth - month
+    occurrences = Math.max(1, monthsBetween + 1)
+    const targetMonth = month - 1 + occurrences
+    const targetYear = year + Math.floor(targetMonth / 12)
+    const normalizedMonth = targetMonth % 12
+    nextDate = new Date(targetYear, normalizedMonth, Math.min(baseDay, new Date(targetYear, normalizedMonth + 1, 0).getDate()))
+    if (nextDate <= nowDate) {
+      const followingMonth = normalizedMonth + 1
+      const followingYear = targetYear + Math.floor(followingMonth / 12)
+      const normalizedFollowingMonth = followingMonth % 12
+      nextDate = new Date(followingYear, normalizedFollowingMonth, Math.min(baseDay, new Date(followingYear, normalizedFollowingMonth + 1, 0).getDate()))
+    }
+  } else {
+    occurrences = Math.max(1, todayYear - year + 1)
+    let targetYear = year + occurrences
+    nextDate = new Date(targetYear, month - 1, Math.min(baseDay, new Date(targetYear, month, 0).getDate()))
+    if (nextDate <= nowDate) {
+      targetYear += 1
+      nextDate = new Date(targetYear, month - 1, Math.min(baseDay, new Date(targetYear, month, 0).getDate()))
+    }
+  }
+
+  return getLocalDateKey(nextDate)
+}
 
 function Dashboard({ theme, onThemeChange }: DashboardProps) {
-  const { transactions } = useGlobalContext()
+  const { transactions, dispatch } = useGlobalContext()
   const [currentMonth, setCurrentMonth] = useState(getCurrentTransactionMonth)
   const [selectedMonth, setSelectedMonth] = useState(() => currentMonth)
   const [activePage, setActivePage] = useState<Page>('overview')
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false)
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false)
+  const [isAddReminderOpen, setIsAddReminderOpen] = useState(false)
+  const [reminders, setReminders] = useLocalStorage<Reminder[]>('penny-wise-reminders', [])
+  const [paymentReminderId, setPaymentReminderId] = useState<string | null>(null)
   const [accountDialogMode, setAccountDialogMode] = useState<'add' | 'edit'>('add')
   const [transactionMode, setTransactionMode] = useState<TransactionMode>('any')
   const transactionDialogRef = useRef<HTMLDialogElement>(null)
@@ -51,6 +107,43 @@ function Dashboard({ theme, onThemeChange }: DashboardProps) {
       : transactions.filter((transaction) => getTransactionMonth(transaction) === activeMonth),
     [activeMonth, transactions],
   )
+  const paymentReminder = reminders.find((reminder) => reminder.id === paymentReminderId) ?? null
+
+  const recordReminderPayment = (amount: number) => {
+    if (!paymentReminder) return
+    const paidAt = new Date()
+    const paidDate = getLocalDateKey(paidAt)
+    dispatch({
+      type: 'ADD_TRANSACTION',
+      payload: {
+        id: crypto.randomUUID(),
+        text: paymentReminder.title,
+        amount: -amount,
+        category: paymentReminder.category,
+        date: paidAt.toISOString(),
+      },
+    })
+    setReminders((existing) => existing.map((reminder) => {
+      if (reminder.id !== paymentReminder.id) return reminder
+      if (reminder.isRecurring) {
+        return {
+          ...reminder,
+          amount: (reminder.hasConfiguredAmount ?? !reminder.isRecurring)
+            ? reminder.amount
+            : undefined,
+          dueDate: getNextReminderDate(
+            reminder.dueDate,
+            reminder.recurrence ?? 'monthly',
+            paidDate,
+            reminder.recurrenceDay,
+          ),
+          status: 'unpaid',
+        }
+      }
+      return { ...reminder, amount, status: 'paid' }
+    }))
+    setPaymentReminderId(null)
+  }
 
   useEffect(() => {
     if (isAddTransactionOpen && transactionDialogRef.current && !transactionDialogRef.current.open) {
@@ -89,6 +182,25 @@ function Dashboard({ theme, onThemeChange }: DashboardProps) {
     setIsAddTransactionOpen(true)
   }
 
+  const openMobileQuickAction = () => {
+    if (activePage === 'liquidity') {
+      setAccountDialogMode('add')
+      setIsAddAccountOpen(true)
+      return
+    }
+    if (activePage === 'reminders') {
+      setIsAddReminderOpen(true)
+      return
+    }
+    openAddTransaction()
+  }
+
+  const mobileQuickAction = activePage === 'liquidity'
+    ? { label: 'Add account', dialogId: 'add-bank-account-form' }
+    : activePage === 'reminders'
+      ? { label: 'Add reminder', dialogId: 'add-reminder-dialog' }
+      : { label: 'Add transaction', dialogId: 'add-transaction-dialog' }
+
   const periodLabel = activeMonth === 'all'
     ? 'Across all transactions'
     : `For ${getTransactionMonthLabel(activeMonth)}`
@@ -122,6 +234,14 @@ function Dashboard({ theme, onThemeChange }: DashboardProps) {
           >
             Liquidity
           </button>
+          <button
+            className="page-nav__link"
+            type="button"
+            aria-current={activePage === 'reminders' ? 'page' : undefined}
+            onClick={() => setActivePage('reminders')}
+          >
+            Reminders
+          </button>
         </nav>
         <section className="page-heading" aria-labelledby="page-title">
           <div>
@@ -131,14 +251,18 @@ function Dashboard({ theme, onThemeChange }: DashboardProps) {
                 ? 'Your overview'
                 : activePage === 'dashboard'
                   ? 'Your dashboard'
-                  : 'Your liquidity'}
+                  : activePage === 'liquidity'
+                    ? 'Your liquidity'
+                    : 'Your reminders'}
             </h1>
             <p className="page-subtitle">
               {activePage === 'overview'
                 ? 'Make every penny count wisely.'
                 : activePage === 'dashboard'
                   ? 'See how your money moves over time.'
-                  : 'Track available cash and bank coverage in one place.'}
+                  : activePage === 'liquidity'
+                    ? 'Track available cash and bank coverage in one place.'
+                    : 'Stay on top of bills, tuition, and other upcoming payments.'}
             </p>
           </div>
           <div className="page-heading__actions">
@@ -177,7 +301,15 @@ function Dashboard({ theme, onThemeChange }: DashboardProps) {
                 Add account
               </button>
             )}
-            {activePage !== 'liquidity' && (
+            {activePage === 'reminders' && (
+              <button className="btn-add-transaction reminders-heading__add" type="button" onClick={() => setIsAddReminderOpen(true)}>
+                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+                Add reminder
+              </button>
+            )}
+            {activePage !== 'liquidity' && activePage !== 'reminders' && (
               <button
                 className="btn-add-transaction"
                 type="button"
@@ -216,7 +348,7 @@ function Dashboard({ theme, onThemeChange }: DashboardProps) {
           </>
         ) : activePage === 'dashboard' ? (
           <AnalyticsDashboard transactions={transactions} />
-        ) : (
+        ) : activePage === 'liquidity' ? (
           <LiquidityDashboard
             isAddAccountOpen={isAddAccountOpen}
             accountDialogMode={accountDialogMode}
@@ -225,6 +357,24 @@ function Dashboard({ theme, onThemeChange }: DashboardProps) {
               setIsAddAccountOpen(true)
             }}
             onCloseAddAccount={() => setIsAddAccountOpen(false)}
+          />
+        ) : (
+          <ReminderDashboard
+            reminders={reminders}
+            onAddReminder={(reminder) => setReminders((existing) => [{
+              ...reminder,
+              id: crypto.randomUUID(),
+              status: 'unpaid',
+            }, ...existing])}
+            onUpdateReminder={(updated) => setReminders((existing) =>
+              existing.map((reminder) => reminder.id === updated.id ? updated : reminder),
+            )}
+            onDeleteReminder={(id) => setReminders((existing) =>
+              existing.filter((reminder) => reminder.id !== id),
+            )}
+            onRequestPayment={setPaymentReminderId}
+            isAddOpen={isAddReminderOpen}
+            onAddOpenChange={setIsAddReminderOpen}
           />
         )}
         <footer className="dashboard-footer">Your finances, thoughtfully organized.</footer>
@@ -258,15 +408,15 @@ function Dashboard({ theme, onThemeChange }: DashboardProps) {
         <button
           className="mobile-bottom-nav__add"
           type="button"
-          onClick={() => openAddTransaction()}
-          aria-label="Add transaction"
+          onClick={openMobileQuickAction}
+          aria-label={mobileQuickAction.label}
           aria-haspopup="dialog"
-          aria-controls="add-transaction-dialog"
+          aria-controls={mobileQuickAction.dialogId}
         >
           <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
             <path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
           </svg>
-        </button>
+        </button>             
         <button
           className="mobile-bottom-nav__link"
           type="button"
@@ -280,6 +430,18 @@ function Dashboard({ theme, onThemeChange }: DashboardProps) {
             <path d="M4 10h16m-11 5h3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
           </svg>
         </button>
+        <button
+          className="mobile-bottom-nav__link"
+          type="button"
+          aria-label="Reminders"
+          title="Reminders"
+          aria-current={activePage === 'reminders' ? 'page' : undefined}
+          onClick={() => setActivePage('reminders')}
+        >
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Zm-8 12h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>   
       </nav>
       {isAddTransactionOpen && (
         <dialog
@@ -308,6 +470,16 @@ function Dashboard({ theme, onThemeChange }: DashboardProps) {
           />
         </dialog>
       )}
+      <ReminderPopup
+        reminders={reminders}
+        onRequestPayment={setPaymentReminderId}
+      />
+      <ReminderPaymentDialog
+        key={paymentReminder?.id ?? 'no-payment'}
+        reminder={paymentReminder}
+        onClose={() => setPaymentReminderId(null)}
+        onConfirm={recordReminderPayment}
+      />
     </div>
   )
 }

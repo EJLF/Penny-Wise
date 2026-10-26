@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import DeleteConfirmDialog from './DeleteConfirmDialog'
 import { useGlobalContext } from '../context/useGlobalContext'
 import type { Transaction as TransactionItem } from '../context/AppReducer'
 import { formatCurrency } from '../utils/formatCurrency'
@@ -5,6 +7,12 @@ import { formatCurrency } from '../utils/formatCurrency'
 const Transaction = ({ transaction }: { transaction: TransactionItem }) => {
   const { dispatch } = useGlobalContext()
   const isIncome = transaction.amount > 0
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
+
+  const deleteTransaction = () => {
+    dispatch({ type: 'DELETE_TRANSACTION', payload: transaction.id })
+    setIsDeleteConfirmOpen(false)
+  }
 
   return (
     <li className={`transaction-row${isIncome ? ' transaction-row--income' : ''}`}>
@@ -33,12 +41,20 @@ const Transaction = ({ transaction }: { transaction: TransactionItem }) => {
         className="delete-btn"
         type="button"
         aria-label={`Delete ${transaction.text}`}
-        onClick={() => dispatch({ type: 'DELETE_TRANSACTION', payload: transaction.id })}
+        onClick={() => setIsDeleteConfirmOpen(true)}
       >
         <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
           <path d="M4 6h12M8 6V4h4v2m2 0-.7 10H6.7L6 6m2.5 3v4m3-4v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
+      {isDeleteConfirmOpen && (
+        <DeleteConfirmDialog
+          itemName={transaction.text}
+          itemType="transaction"
+          onConfirm={deleteTransaction}
+          onCancel={() => setIsDeleteConfirmOpen(false)}
+        />
+      )}
     </li>
   )
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
+import DeleteConfirmDialog from './DeleteConfirmDialog'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useCurrentDateKey } from '../hooks/useCurrentDateKey'
 import {
@@ -46,6 +47,7 @@ const LiquidityDashboard = ({
   )
   const accountDialogRef = useRef<HTMLDialogElement>(null)
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null)
+  const [accountToDelete, setAccountToDelete] = useState<BankAccount | null>(null)
   const [selectedBank, setSelectedBank] = useState('BDO')
   const [customBankName, setCustomBankName] = useState('')
   const [accountType, setAccountType] = useState('Savings')
@@ -101,22 +103,6 @@ const LiquidityDashboard = ({
   }, [accounts, setAccounts, today])
 
   const totalLiquidCash = sum(accounts.map((account) => getCurrentAccountBalance(account, today)))
-  const bankGroups = Array.from(
-    accounts.reduce((groups, account) => {
-      const key = account.bankName.trim().toLocaleLowerCase()
-      const existing = groups.get(key) ?? {
-        bankName: account.bankName,
-        currentBalance: 0,
-      }
-      existing.currentBalance += getCurrentAccountBalance(account, today)
-      groups.set(key, existing)
-      return groups
-    }, new Map<string, {
-      bankName: string
-      currentBalance: number
-    }>()).values(),
-  ).sort((left, right) => right.currentBalance - left.currentBalance)
-
   const setTermsForAccount = (bankName: string, type: string, excludeId?: string) => {
     const matching = findMatchingAccount(accounts, bankName, type, excludeId)
     setInterestRate(matching ? String(matching.interestRate) : '0')
@@ -467,9 +453,7 @@ const LiquidityDashboard = ({
                         className="liquidity-account-card__remove"
                         type="button"
                         aria-label={`Remove ${account.bankName} ${account.accountType} account`}
-                        onClick={() => setAccounts((existing) =>
-                          existing.filter((item) => item.id !== account.id),
-                        )}
+                        onClick={() => setAccountToDelete(account)}
                       >
                         <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
                           <path d="M4 6h12M8 6V4h4v2m2 0-.7 10H6.7L6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -517,6 +501,19 @@ const LiquidityDashboard = ({
       <p className="liquidity-disclaimer">
         Accounts are not connected to your bank. Balances and interest rates are entered and maintained by you.
       </p>
+      {accountToDelete && (
+        <DeleteConfirmDialog
+          itemName={`${accountToDelete.bankName} ${accountToDelete.accountType} account`}
+          itemType="account"
+          onConfirm={() => {
+            setAccounts((existing) =>
+              existing.filter((item) => item.id !== accountToDelete.id),
+            )
+            setAccountToDelete(null)
+          }}
+          onCancel={() => setAccountToDelete(null)}
+        />
+      )}
     </section>
   )
 }
