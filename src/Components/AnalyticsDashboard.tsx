@@ -1,5 +1,12 @@
 import { useState, type KeyboardEvent } from 'react'
 import type { Transaction } from '../context/AppReducer'
+import { useLocalStorage } from '../hooks/useLocalStorage'
+import { useCurrentDateKey } from '../hooks/useCurrentDateKey'
+import {
+  getCurrentAccountBalance,
+  type InterestFrequency,
+} from '../utils/bankAccountBalance'
+import { getBankBrand } from '../utils/bankBrands'
 import { formatCurrency } from '../utils/formatCurrency'
 import {
   getCurrentTransactionMonth,
@@ -25,11 +32,21 @@ type ExpenseSlice = {
   amount: number
 }
 
+type BankAccount = {
+  id: string
+  bankName: string
+  currentBalance: number
+  interestRate?: number
+  interestFrequency?: InterestFrequency
+  createdAt?: string
+}
+
 const analyticsTabs = [
   { id: 'expenses', label: 'Expenses' },
   { id: 'trend', label: 'Spending trend' },
   { id: 'comparison', label: 'Income vs. expenses' },
   { id: 'savings', label: 'Savings' },
+  { id: 'distribution', label: 'Cash distribution' },
 ] as const
 
 type AnalyticsTab = typeof analyticsTabs[number]['id']
@@ -186,6 +203,18 @@ const LineChart = ({ data, values, color, label, allowNegative = false }: LineCh
 const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('expenses')
   const [expenseMonth, setExpenseMonth] = useState('all')
+  const [bankAccounts] = useLocalStorage<BankAccount[]>('penny-wise-bank-accounts', [])
+  const today = useCurrentDateKey()
+  const bankBalances = Array.from(
+    bankAccounts.reduce((groups, account) => {
+      const key = account.bankName.trim().toLocaleLowerCase()
+      const existing = groups.get(key) ?? { bankName: account.bankName, balance: 0 }
+      existing.balance += getCurrentAccountBalance(account, today)
+      groups.set(key, existing)
+      return groups
+    }, new Map<string, { bankName: string; balance: number }>()).values(),
+  ).sort((left, right) => right.balance - left.balance)
+  const totalBankCash = bankBalances.reduce((total, bank) => total + bank.balance, 0)
   const currentMonth = getCurrentTransactionMonth()
   const monthlyData = getMonthlyData(transactions)
   const currentMonths = monthlyData.filter((month) => month.key <= currentMonth)
@@ -295,6 +324,12 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
                 <>
                   <path d="M4 15.5c0-3.6 3.3-6.5 8-6.5s8 2.9 8 6.5-3.3 5.5-8 5.5-8-1.9-8-5.5Z" stroke="currentColor" strokeWidth="1.8" />
                   <path d="M8 9V5l4 2 4-2v4m-4 4v5m-2.5-2.5h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </>
+              )}
+              {tab.id === 'distribution' && (
+                <>
+                  <rect x="3" y="5" width="18" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.8" />
+                  <path d="M3 10h18m-12 5h3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                 </>
               )}
             </svg>
@@ -599,6 +634,56 @@ const AnalyticsDashboard = ({ transactions }: AnalyticsDashboardProps) => {
           </>
         ) : (
           <p className="empty-state">Add dated transactions to see your savings growth.</p>
+        )}
+      </article>
+      <article
+        className="liquidity-distribution panel analytics-panel"
+        id="analytics-panel-distribution"
+        role="tabpanel"
+        aria-labelledby="analytics-tab-distribution"
+        data-analytics-panel="distribution"
+      >
+        <div className="liquidity-section-heading">
+          <div>
+            <h2 className="panel__title" id="dashboard-cash-distribution-title">Cash distribution</h2>
+            <p className="panel__subtitle">Current balance across your banks</p>
+          </div>
+          <strong>{formatCurrency(totalBankCash)}</strong>
+        </div>
+        {bankBalances.length > 0 ? (
+          <>
+            <div className="liquidity-distribution__bar" aria-label="Current cash distribution by bank">
+              {bankBalances.map((bank) => (
+                <span
+                  key={bank.bankName}
+                  className="liquidity-distribution__segment"
+                  style={{
+                    width: `${totalBankCash > 0 ? bank.balance / totalBankCash * 100 : 0}%`,
+                    backgroundColor: getBankBrand(bank.bankName).color,
+                  }}
+                  title={`${bank.bankName}: ${formatCurrency(bank.balance)}`}
+                />
+              ))}
+            </div>
+            <ul className="liquidity-distribution__list">
+              {bankBalances.map((bank) => (
+                <li key={bank.bankName}>
+                  <span className="liquidity-distribution__bank">
+                    <i style={{ backgroundColor: getBankBrand(bank.bankName).color }} />
+                    {bank.bankName}
+                  </span>
+                  <strong>{formatCurrency(bank.balance)}</strong>
+                  <small>
+                    {totalBankCash > 0
+                      ? `${Math.round(bank.balance / totalBankCash * 100)}%`
+                      : '0%'}
+                  </small>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <p className="empty-state">Add bank accounts in Liquidity to see your cash distribution.</p>
         )}
       </article>
       </div>

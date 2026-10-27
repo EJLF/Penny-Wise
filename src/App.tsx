@@ -4,6 +4,7 @@ import Balance from './Components/Balance'
 import IncomeExpenses from './Components/IncomeExpenses'
 import TransactionList from './Components/TransactionList'
 import AnalyticsDashboard from './Components/AnalyticsDashboard'
+import LiquidityDashboard from './Components/LiquidityDashboard'
 import AddTransaction from './Components/AddTransaction'
 import type { TransactionMode } from './Components/AddTransaction'
 import type { AppTheme } from './Components/Header'
@@ -23,7 +24,7 @@ type DashboardProps = {
   onThemeChange: (theme: AppTheme) => void
 }
 
-type Page = 'overview' | 'dashboard'
+type Page = 'overview' | 'dashboard' | 'liquidity'
 
 function Dashboard({ theme, onThemeChange }: DashboardProps) {
   const { transactions } = useGlobalContext()
@@ -31,6 +32,8 @@ function Dashboard({ theme, onThemeChange }: DashboardProps) {
   const [selectedMonth, setSelectedMonth] = useState(() => currentMonth)
   const [activePage, setActivePage] = useState<Page>('overview')
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false)
+  const [isAddAccountOpen, setIsAddAccountOpen] = useState(false)
+  const [accountDialogMode, setAccountDialogMode] = useState<'add' | 'edit'>('add')
   const [transactionMode, setTransactionMode] = useState<TransactionMode>('any')
   const transactionDialogRef = useRef<HTMLDialogElement>(null)
   const currentMonthRef = useRef(currentMonth)
@@ -111,15 +114,31 @@ function Dashboard({ theme, onThemeChange }: DashboardProps) {
           >
             Dashboard
           </button>
+          <button
+            className="page-nav__link"
+            type="button"
+            aria-current={activePage === 'liquidity' ? 'page' : undefined}
+            onClick={() => setActivePage('liquidity')}
+          >
+            Liquidity
+          </button>
         </nav>
         <section className="page-heading" aria-labelledby="page-title">
           <div>
             <p className="eyebrow">PERSONAL FINANCE</p>
-            <h1 id="page-title">{activePage === 'overview' ? 'Your overview' : 'Your dashboard'}</h1>
+            <h1 id="page-title">
+              {activePage === 'overview'
+                ? 'Your overview'
+                : activePage === 'dashboard'
+                  ? 'Your dashboard'
+                  : 'Your liquidity'}
+            </h1>
             <p className="page-subtitle">
               {activePage === 'overview'
                 ? 'Make every penny count wisely.'
-                : 'See how your money moves over time.'}
+                : activePage === 'dashboard'
+                  ? 'See how your money moves over time.'
+                  : 'Track available cash and bank coverage in one place.'}
             </p>
           </div>
           <div className="page-heading__actions">
@@ -141,18 +160,37 @@ function Dashboard({ theme, onThemeChange }: DashboardProps) {
                 </select>
               </>
             )}
-            <button
-              className="btn-add-transaction"
-              type="button"
-              onClick={() => openAddTransaction()}
-              aria-haspopup="dialog"
-              aria-controls="add-transaction-dialog"
-            >
-              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                <path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
-              Add transaction
-            </button>
+            {activePage === 'liquidity' && (
+              <button
+                className="btn liquidity-heading__add"
+                type="button"
+                onClick={() => {
+                  setAccountDialogMode('add')
+                  setIsAddAccountOpen(true)
+                }}
+                aria-haspopup="dialog"
+                aria-controls="add-bank-account-form"
+              >
+                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+                Add account
+              </button>
+            )}
+            {activePage !== 'liquidity' && (
+              <button
+                className="btn-add-transaction"
+                type="button"
+                onClick={() => openAddTransaction()}
+                aria-haspopup="dialog"
+                aria-controls="add-transaction-dialog"
+              >
+                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+                Add transaction
+              </button>
+            )}
           </div>
         </section>
 
@@ -176,8 +214,18 @@ function Dashboard({ theme, onThemeChange }: DashboardProps) {
               />
             </section>
           </>
-        ) : (
+        ) : activePage === 'dashboard' ? (
           <AnalyticsDashboard transactions={transactions} />
+        ) : (
+          <LiquidityDashboard
+            isAddAccountOpen={isAddAccountOpen}
+            accountDialogMode={accountDialogMode}
+            onOpenAccountDialog={(mode) => {
+              setAccountDialogMode(mode)
+              setIsAddAccountOpen(true)
+            }}
+            onCloseAddAccount={() => setIsAddAccountOpen(false)}
+          />
         )}
         <footer className="dashboard-footer">Your finances, thoughtfully organized.</footer>
       </main>
@@ -196,6 +244,18 @@ function Dashboard({ theme, onThemeChange }: DashboardProps) {
           </svg>
         </button>
         <button
+          className="mobile-bottom-nav__link"
+          type="button"
+          aria-label="Dashboard"
+          title="Dashboard"
+          aria-current={activePage === 'dashboard' ? 'page' : undefined}
+          onClick={() => setActivePage('dashboard')}
+        >
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 19V11m5 8V5m5 14v-6m6 6V8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        </button>
+        <button
           className="mobile-bottom-nav__add"
           type="button"
           onClick={() => openAddTransaction()}
@@ -210,13 +270,14 @@ function Dashboard({ theme, onThemeChange }: DashboardProps) {
         <button
           className="mobile-bottom-nav__link"
           type="button"
-          aria-label="Dashboard"
-          title="Dashboard"
-          aria-current={activePage === 'dashboard' ? 'page' : undefined}
-          onClick={() => setActivePage('dashboard')}
+          aria-label="Liquidity"
+          title="Liquidity"
+          aria-current={activePage === 'liquidity' ? 'page' : undefined}
+          onClick={() => setActivePage('liquidity')}
         >
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M4 19V11m5 8V5m5 14v-6m6 6V8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            <rect x="3.5" y="6" width="17" height="13" rx="2.5" stroke="currentColor" strokeWidth="1.7" />
+            <path d="M4 10h16m-11 5h3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
           </svg>
         </button>
       </nav>
