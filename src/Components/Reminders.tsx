@@ -1,20 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import DeleteConfirmDialog from './DeleteConfirmDialog'
 import { formatCurrency } from '../utils/formatCurrency'
-
-export type Reminder = {
-  id: string
-  title: string
-  category: string
-  amount?: number
-  dueDate: string
-  daysBefore: number
-  status: 'paid' | 'unpaid'
-  isRecurring?: boolean
-  recurrence?: 'daily' | 'weekly' | 'monthly' | 'yearly'
-  recurrenceDay?: number
-  hasConfiguredAmount?: boolean
-}
+import type { Reminder, ReminderRecurrence } from '../types/reminder'
 
 const hasConfiguredAmount = (reminder: Reminder) =>
   reminder.hasConfiguredAmount ?? !reminder.isRecurring
@@ -37,12 +24,31 @@ const getTodayDate = () => {
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 }
 
-const isReminderDue = (reminder: Reminder, today: string) => {
+const getReminderStatus = (reminder: Reminder, today: string): Reminder['status'] => {
+  if (!reminder.isRecurring || !reminder.lastPaidDate) {
+    return reminder.status
+  }
+
+  if (
+    (reminder.recurrence ?? 'monthly') === 'monthly' &&
+    reminder.lastPaidDate.slice(0, 7) === today.slice(0, 7)
+  ) {
+    return 'paid'
+  }
+
   const dueDate = new Date(`${reminder.dueDate}T00:00:00`)
-  const reminderStart = new Date(dueDate)
+  dueDate.setDate(dueDate.getDate() - reminder.daysBefore)
+  const reminderStartDate = `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, '0')}-${String(dueDate.getDate()).padStart(2, '0')}`
+
+  return today >= reminderStartDate ? 'unpaid' : 'paid'
+}
+
+const isReminderDue = (reminder: Reminder, today: string) => {
+  const reminderStart = new Date(`${reminder.dueDate}T00:00:00`)
   reminderStart.setDate(reminderStart.getDate() - reminder.daysBefore)
   const startDate = `${reminderStart.getFullYear()}-${String(reminderStart.getMonth() + 1).padStart(2, '0')}-${String(reminderStart.getDate()).padStart(2, '0')}`
-  return reminder.status === 'unpaid' && today >= startDate
+
+  return getReminderStatus(reminder, today) === 'unpaid' && today >= startDate
 }
 
 type ReminderFormProps = {
@@ -62,7 +68,7 @@ const ReminderForm = ({ reminder, onSave, onCancel }: ReminderFormProps) => {
   const [dueDate, setDueDate] = useState(reminder?.dueDate ?? getTodayDate())
   const [daysBefore, setDaysBefore] = useState(String(reminder?.daysBefore ?? 1))
   const [isRecurring, setIsRecurring] = useState(reminder?.isRecurring ?? false)
-  const [recurrence, setRecurrence] = useState<NonNullable<Reminder['recurrence']>>(
+  const [recurrence, setRecurrence] = useState<ReminderRecurrence>(
     reminder?.recurrence ?? 'monthly',
   )
   const [error, setError] = useState('')
@@ -246,6 +252,7 @@ const ReminderDashboard = ({
         <div className="reminder-list">
           {sortedReminders.map((reminder) => {
             const isDue = isReminderDue(reminder, today)
+            const status = getReminderStatus(reminder, today)
             return (
               <article className="panel reminder-card" key={reminder.id}>
                 <div className="reminder-card__main">
@@ -254,8 +261,8 @@ const ReminderDashboard = ({
                       <h2>{reminder.title}</h2>
                       <span className="reminder-card__category">{reminder.category}</span>
                     </div>
-                    <span className={`reminder-status reminder-status--${reminder.status}`}>
-                      {reminder.status}
+                    <span className={`reminder-status reminder-status--${status}`}>
+                      {status}
                     </span>
                   </div>
                   <div className="reminder-card__details">
@@ -267,7 +274,7 @@ const ReminderDashboard = ({
                   </div>
                 </div>
                 <div className="reminder-card__actions">
-                  {reminder.status === 'unpaid' && (
+                  {status === 'unpaid' && (
                     <button className="reminder-action" type="button" onClick={() => onRequestPayment(reminder.id)}>Mark paid</button>
                   )}
                   <button className="reminder-action" type="button" onClick={() => {
