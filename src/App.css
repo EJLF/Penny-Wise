@@ -2183,13 +2183,18 @@ input:focus-visible {
   }
 
   .reminder-card {
-    align-items: flex-start;
+    align-items: stretch;
     flex-direction: column;
     gap: 14px;
-    padding: 18px;
+    padding: 16px;
+  }
+
+  .reminder-card__main {
+    width: 100%;
   }
 
   .reminder-card__actions {
+    width: 100%;
     justify-content: flex-start;
   }
 
